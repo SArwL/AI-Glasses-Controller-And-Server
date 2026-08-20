@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- 照片滑动容器 -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vpPhotoViewer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 左上角返回按钮 -->
+    <Button
+        android:id="@+id/btnBack"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|top"
+        android:layout_margin="12dp"
+        android:text="← 返回"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#66000000" />
+
+    <!-- 底部按钮栏 -->
+    <LinearLayout
+        android:id="@+id/llBottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:background="#CC000000">
+
+        <Button
+            android:id="@+id/btnDelete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="删除"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E53935" />
+
+        <TextView
+            android:id="@+id/tvPosition"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="1 / 10"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:gravity="center" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="保存到相册"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#43A047" />
+
+    </LinearLayout>
+
+</FrameLayout>

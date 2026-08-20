@@ -1,0 +1,27 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# ============ 项目专属 ============
+# Claude Code 本地配置
+.claude/
+
+# 厂商 SDK 二进制（专有内容，不入库；编译需自行放入）
+app/libs/
+
+# 厂商 SDK 文档与个人开发日志
+docs/
+GLASSES_SDK_DOC_CN.pdf
+AI眼镜SDK开发日志.docx
