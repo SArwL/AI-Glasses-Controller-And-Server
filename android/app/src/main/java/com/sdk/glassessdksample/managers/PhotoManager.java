@@ -45,6 +45,25 @@ public class PhotoManager {
     private String lastPhotoPath = null;
     private ByteArrayOutputStream thumbnailAccumulator = null;
 
+    /** 缩略图保存完成回调（用于上传后端），可为 null */
+    private OnThumbnailReadyListener onThumbnailReadyListener;
+
+    /**
+     * 缩略图就绪回调。
+     * 在调用线程（SDK 回调线程）中触发，**非主线程**，实现方需自行处理线程切换。
+     */
+    public interface OnThumbnailReadyListener {
+        /**
+         * @param jpegFile 已裁剪并保存为 .jpg 的缩略图文件
+         */
+        void onThumbnailReady(File jpegFile);
+    }
+
+    /** 设置缩略图就绪回调 */
+    public void setOnThumbnailReadyListener(OnThumbnailReadyListener listener) {
+        this.onThumbnailReadyListener = listener;
+    }
+
     public PhotoManager(Activity activity, Handler mainHandler,
                         ImageView ivPhotoPreview,
                         OnCaptureCompleteListener onCaptureCompleteListener) {
@@ -97,6 +116,48 @@ public class PhotoManager {
                     }
                 }
         );
+    }
+
+    // ==================== 智能拍照 ====================
+
+    /** 智能拍照的缩略图尺寸参数，SDK 文档标注取值范围 0~6，示例值为 2 */
+    private static final byte THUMBNAIL_SIZE = 0x02;
+
+    /**
+     * 发送智能拍照指令 (0x02, 0x01, 0x06, size, size, 0x02)。
+     *
+     * <p>与 {@link #takePhoto()} 的区别：普通拍照指令 (0x02,0x01,0x01) **不会触发缩略图事件 0x02**，
+     * 因此拿不到缩略图；智能拍照会触发事件 0x02，由 {@code MediaSyncManager} 的
+     * deviceNotifyListener 捕获后调用 {@code getPictureThumbnails()} 拉取缩略图分包，
+     * 最终经 {@link #receiveThumbnailChunk} 累积并由 {@link #saveThumbnail} 保存。</p>
+     *
+     * <p>因此本方法**不需要处理响应回调**——真正的结果通过上述事件链异步交付。</p>
+     *
+     * @see #setOnThumbnailReadyListener 缩略图保存完成后的回调
+     */
+    public void takeSmartPhoto() {
+        if (!BleOperateManager.getInstance().isConnected()) {
+            Toast.makeText(activity, "请先连接眼镜设备", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Log.i(TAG, "发送智能拍照指令，缩略图尺寸=" + THUMBNAIL_SIZE);
+        mainHandler.post(() ->
+                Toast.makeText(activity, "智能拍照中，等待缩略图…", Toast.LENGTH_SHORT).show());
+
+        LargeDataHandler.getInstance().glassesControl(
+                new byte[]{0x02, 0x01, 0x06, THUMBNAIL_SIZE, THUMBNAIL_SIZE, 0x02},
+                (cmdType, response) -> {
+                    // 仅记录状态用于排查：即使响应为 null 或 workType 非预期，
+                    // 缩略图仍可能通过事件 0x02 正常送达
+                    if (response != null) {
+                        Log.i(TAG, "智能拍照响应: dataType=" + response.getDataType()
+                                + ", errCode=" + response.getErrorCode()
+                                + ", workType=" + response.getWorkTypeIng());
+                    } else {
+                        Log.i(TAG, "智能拍照响应为空（不影响事件 0x02 的缩略图送达）");
+                    }
+                });
     }
 
     // ==================== 缩略图（智能拍照） ====================
@@ -184,6 +245,19 @@ public class PhotoManager {
         String fileName = "thumb_" + System.currentTimeMillis() + ".jpg";
         String filePath = photoDir.getAbsolutePath() + "/" + fileName;
         FileUtils.writeToFile(jpegData, filePath);
+
+        // 通知外部（如后端上传）；在回调线程中直接触发，避免大图操作影响主线程
+        if (onThumbnailReadyListener != null) {
+            File saved = new File(filePath);
+            if (saved.exists() && saved.length() > 0) {
+                try {
+                    onThumbnailReadyListener.onThumbnailReady(saved);
+                } catch (Exception e) {
+                    Log.e(TAG, "缩略图就绪回调异常", e);
+                }
+            }
+        }
+
         // 保存完成后切回主线程加载预览
         mainHandler.post(() -> loadPhotoPreview(filePath));
     }

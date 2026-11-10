@@ -1,6 +1,6 @@
 package com.sdk.glassessdksample.receivers;
 
-import android.Manifest;
+import  android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;

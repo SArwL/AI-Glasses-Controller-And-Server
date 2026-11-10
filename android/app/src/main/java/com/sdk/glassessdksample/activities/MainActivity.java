@@ -26,6 +26,9 @@ import com.sdk.glassessdksample.R;
 import com.sdk.glassessdksample.events.BluetoothEvent;
 import com.sdk.glassessdksample.events.BtPairEvent;
 import com.sdk.glassessdksample.managers.AiDialogueManager;
+import com.sdk.glassessdksample.managers.AiReplyAudioManager;
+import com.sdk.glassessdksample.managers.AiUdpManager;
+import com.sdk.glassessdksample.managers.AiUploader;
 import com.sdk.glassessdksample.managers.AudioPlaybackManager;
 import com.sdk.glassessdksample.managers.BleConnectionManager;
 import com.sdk.glassessdksample.managers.MediaSyncManager;
@@ -69,6 +72,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvConnectionStatus;
     private TextView tvBatteryInfo;
     private TextView tvBtStatus;
+    private TextView tvAiBackendStatus;
+    private Button btnAiMode;
     private Button btnScanDevice;
     private Button btnDisconnect;
     private Button btnTakePhoto;
@@ -145,13 +150,33 @@ public class MainActivity extends AppCompatActivity {
         requestPermissionsIfNeeded();
     }
 
-    /** 回到前台：刷新连接状态UI、检查/请求开启蓝牙、刷新音频文件列表 */
+    /** 回到前台：刷新连接状态UI、检查/请求开启蓝牙、刷新音频文件列表、刷新AI后端状态 */
     @Override
     protected void onResume() {
         super.onResume();
         bleConnectionManager.updateConnectionStatus();
         enableBluetoothIfNeeded();
         audioPlaybackManager.refreshAudioFileList();
+        updateAiBackendStatus();
+    }
+
+    /**
+     * 刷新主界面的「AI 后端」状态显示。
+     * 连接由 {@link AiUdpManager} 单例跨页面持有，因此每次回到前台都要重新读取。
+     */
+    private void updateAiBackendStatus() {
+        AiUdpManager udp = AiUdpManager.getInstance();
+        if (udp.isConnected()) {
+            String host = udp.getTargetHost();
+            int port = udp.getTargetPort();
+            tvAiBackendStatus.setText(udp.isVerified()
+                    ? "AI 后端: ● 已连接 " + host + ":" + port
+                    : "AI 后端: ● 已连接(未校验) " + host + ":" + port);
+            tvAiBackendStatus.setTextColor(udp.isVerified() ? 0xFF2E7D32 : 0xFFF57C00);
+        } else {
+            tvAiBackendStatus.setText("AI 后端: ○ 未连接");
+            tvAiBackendStatus.setTextColor(0xFF888888);
+        }
     }
 
     /** 销毁：停止AI对话PCM监控、反注册EventBus、释放各Manager资源 */
@@ -160,6 +185,8 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         aiDialogueManager.stopPcmMonitor();
         EventBus.getDefault().unregister(this);
+        // 释放回传播报资源（AudioTrack + 播放线程）并注销其 UDP 监听器
+        AiReplyAudioManager.release();
         audioPlaybackManager.onDestroy();
         bleConnectionManager.onDestroy();
         mediaSyncManager.onDestroy();
@@ -188,6 +215,12 @@ public class MainActivity extends AppCompatActivity {
         photoManager = new PhotoManager(this, mainHandler, ivPhotoPreview, onCapture);
         recordingManager = new RecordingManager(this, mainHandler, btnRecord);
 
+        // 5. 后端上传钩子：仅在 UDP 已连接时上传，未连接则静默跳过
+        setupBackendUploadHooks();
+
+        // 6. AI 语音回复的接收与播报（0x32/0x33）+ 用户抢话打断
+        setupReplyAudio();
+
         // 3. BLE连接管理：持有连接状态/电量/配对相关UI控件，负责状态刷新
         bleConnectionManager = new BleConnectionManager(this, mainHandler,
                 tvConnectionStatus, tvBatteryInfo, tvBtStatus,
@@ -199,6 +232,106 @@ public class MainActivity extends AppCompatActivity {
                 aiDialogueManager, audioPlaybackManager);
     }
 
+    // ==================== AI 回复播报 ====================
+
+    /**
+     * 初始化 AI 语音回复的接收与播报，并把"用户抢话"接到打断动作上。
+     *
+     * <p>{@link AiReplyAudioManager} 是单例，构造时会把自身注册为 UDP 监听器，
+     * 因此 0x32/0x33 的接收<b>不再依赖某个页面是否在前台</b>——连接页销毁时只注销它自己的
+     * 监听器，不会影响回传音频（详见 {@link AiUdpManager#addListener}）。</p>
+     */
+    private void setupReplyAudio() {
+        // 触发单例创建：注册 UDP 监听 + 启动播放线程
+        AiReplyAudioManager.getInstance();
+
+        // 用户抢话 → 打断正在播报的回复。打断信号有三条，全部接上（互为冗余：
+        // 同一物理按键会触发多条，而"无内容在播时为空操作"保证了重复调用无副作用）：
+        //   ① 眼镜事件 0x03 麦克风启动  ② 眼镜事件 0x0c 暂停事件（均在 MediaSyncManager 分发）
+        //   ③ 本回调 voiceFromGlassesStatus(1)——SDK 在 speakToPcm() 里发出，源头其实就是 0x03
+        aiDialogueManager.setOnUserSpeechStartListener(
+                () -> AiReplyAudioManager.interruptIfSpeaking("用户开始说话"));
+    }
+
+    // ==================== 后端上传钩子 ====================
+
+    /**
+     * 挂接"数据就绪即上传后端"的两个钩子：
+     * <ul>
+     *   <li>AI 对话：一轮语音的 PCM 拼接完成后 → 上传（{@link AiUdpManager#TYPE_VOICE_PCM}），
+     *       并且<b>无论上传成败都立即删除本地 PCM</b>——它只是送给后端做语音识别的过路数据，
+     *       不长期保存，也不出现在音频列表里</li>
+     *   <li>智能拍照：缩略图保存为 JPEG 后 → 上传（{@link AiUdpManager#TYPE_PHOTO_JPEG}），
+     *       照片属于用户媒体，本地长期保留</li>
+     * </ul>
+     *
+     * <p>两个回调都在后台线程触发，此处只发起异步上传与日志，不做 UI 操作（Toast 仅在完成时弹一次）。
+     * 未连接后端时 {@link AiUploader#uploadAsync} 会直接跳过（一次性数据仍会清理），不影响本地功能。</p>
+     */
+    private void setupBackendUploadHooks() {
+        // 钩子一：AI 对话语音（衔接 AiDialogueManager.mergePcmChunks 的完成点）
+        aiDialogueManager.setOnPcmMergedListener((pcmFile, durationMs) -> {
+            boolean connected = AiUdpManager.getInstance().isConnected();
+            Log.i(TAG, "PCM 就绪: " + pcmFile.getName() + " (" + durationMs + "ms)"
+                    + (connected ? "，开始上传" : "，后端未连接，跳过上传"));
+            // deleteAfterUpload=true：上传流程结束后（成功/断线/异常）由 AiUploader 删除本地文件
+            AiUploader.uploadAsync(pcmFile, AiUdpManager.TYPE_VOICE_PCM,
+                    new AiUploader.ProgressListener() {
+                        @Override
+                        public void onUploadFinished(String fileName, int sentChunks, int totalBytes) {
+                            Log.i(TAG, "语音上传完成: " + fileName + "，"
+                                    + sentChunks + " 片 / " + totalBytes + " 字节");
+                            mainHandler.post(() -> Toast.makeText(MainActivity.this,
+                                    "语音已上传（" + sentChunks + " 片）",
+                                    Toast.LENGTH_SHORT).show());
+                        }
+
+                        @Override
+                        public void onUploadFailed(String fileName, String reason,
+                                                   AiUploader.FailureKind kind) {
+                            Log.w(TAG, "语音上传失败: " + fileName + " — " + reason
+                                    + "（类别=" + kind + "）");
+                            // 传输侧失败 = 这轮语音没能送到后端。该 PCM 已在上传流程结束时被清理、
+                            // 无法补传，用户必须立刻知道，否则会以为 AI 只是没回应。
+                            // 本地侧失败（文件为空/读取异常）与后端无关，不能报成"服务器连接失败"。
+                            final String msg = kind == AiUploader.FailureKind.TRANSPORT
+                                    ? "服务器连接失败：" + reason
+                                    : "语音发送失败：" + reason;
+                            mainHandler.post(() -> Toast.makeText(MainActivity.this,
+                                    msg, Toast.LENGTH_LONG).show());
+                        }
+                    }, true);
+        });
+
+        // 钩子二：智能拍照缩略图（衔接 PhotoManager.saveThumbnail 的完成点）
+        photoManager.setOnThumbnailReadyListener(jpegFile -> {
+            if (!AiUdpManager.getInstance().isConnected()) {
+                Log.i(TAG, "缩略图就绪但后端未连接，跳过上传: " + jpegFile.getName());
+                return;
+            }
+            Log.i(TAG, "缩略图就绪，开始上传: " + jpegFile.getName()
+                    + " (" + jpegFile.length() + " 字节)");
+            AiUploader.uploadAsync(jpegFile, AiUdpManager.TYPE_PHOTO_JPEG,
+                    new AiUploader.ProgressListener() {
+                        @Override
+                        public void onUploadFinished(String fileName, int sentChunks, int totalBytes) {
+                            Log.i(TAG, "缩略图上传完成: " + fileName + "，"
+                                    + totalBytes + " 字节");
+                            mainHandler.post(() -> Toast.makeText(MainActivity.this,
+                                    "缩略图已上传", Toast.LENGTH_SHORT).show());
+                        }
+
+                        @Override
+                        public void onUploadFailed(String fileName, String reason,
+                                                   AiUploader.FailureKind kind) {
+                            // 缩略图本地长期保留，传不出去不会丢数据，因此只记日志、不打扰用户
+                            Log.w(TAG, "缩略图上传失败: " + fileName + " — " + reason
+                                    + "（类别=" + kind + "）");
+                        }
+                    });
+        });
+    }
+
     // ==================== UI 初始化 ====================
 
     /** 绑定布局控件并注册全部按钮点击监听 */
@@ -206,8 +339,10 @@ public class MainActivity extends AppCompatActivity {
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus);
         tvBatteryInfo = findViewById(R.id.tvBatteryInfo);
         tvBtStatus = findViewById(R.id.tvBtStatus);
+        tvAiBackendStatus = findViewById(R.id.tvAiBackendStatus);
 
         btnScanDevice = findViewById(R.id.btnScanDevice);
+        btnAiMode = findViewById(R.id.btnAiMode);
         btnDisconnect = findViewById(R.id.btnDisconnect);
         btnTakePhoto = findViewById(R.id.btnTakePhoto);
         btnRecord = findViewById(R.id.btnRecord);
@@ -228,8 +363,13 @@ public class MainActivity extends AppCompatActivity {
         // 断开连接（委托给BLE连接管理器）
         btnDisconnect.setOnClickListener(v -> bleConnectionManager.disconnect());
 
-        // 拍照（委托给拍照管理器）
+        // 拍照（委托给拍照管理器）。长按改为「智能拍照」——普通拍照不触发缩略图事件，
+        // 只有智能拍照能拿到缩略图并上传后端用于识图。
         btnTakePhoto.setOnClickListener(v -> photoManager.takePhoto());
+        btnTakePhoto.setOnLongClickListener(v -> {
+            photoManager.takeSmartPhoto();
+            return true;  // 消费事件，避免长按后再触发单击的普通拍照
+        });
 
         // 录音（开始/停止切换，状态由录音管理器维护）
         btnRecord.setOnClickListener(v -> recordingManager.toggleRecording());
@@ -249,6 +389,10 @@ public class MainActivity extends AppCompatActivity {
 
         // BT经典蓝牙配对（让眼镜通过A2DP播放手机音频）
         btnBtPair.setOnClickListener(v -> bleConnectionManager.startBtPairing());
+
+        // AI 交互模式 → 进入后端连接页面（首选手动输入/历史地址自动连接）
+        btnAiMode.setOnClickListener(v ->
+                startActivity(new Intent(this, AiConnectionActivity.class)));
 
         // 点击照片全屏查看（当前为占位提示，完整查看在图库界面）
         ivPhotoPreview.setOnClickListener(v -> {

@@ -79,6 +79,12 @@
             android:exported="false"
             android:label="扫描设备" />
 
+        <!-- AI 交互后端连接页 -->
+        <activity
+            android:name="com.sdk.glassessdksample.activities.AiConnectionActivity"
+            android:exported="false"
+            android:label="AI 交互" />
+
         <!-- 照片图库 -->
         <activity
             android:name="com.sdk.glassessdksample.activities.GalleryActivity"

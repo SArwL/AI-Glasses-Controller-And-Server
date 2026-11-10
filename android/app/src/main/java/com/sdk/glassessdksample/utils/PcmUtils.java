@@ -159,4 +159,55 @@ public class PcmUtils {
         dos.writeByte(value & 0xFF);
         dos.writeByte((value >> 8) & 0xFF);
     }
+
+    // ==================== 重采样 ====================
+
+    /**
+     * 16bit 单声道 PCM 重采样（线性插值）。
+     *
+     * <p>用途：后端回传的回复音频是 16kHz，而 Android 设备不一定支持 16kHz 输出采样率。
+     * 此时需要先升采样到设备支持的采样率（通常 48kHz）再交给 AudioTrack 播放，
+     * 否则会出现播放速度不对/创建失败。线性插值对语音质量足够，且不引入额外依赖。</p>
+     *
+     * @param pcm16le 原始 PCM（小端 16bit 单声道）
+     * @param srcRate 源采样率
+     * @param dstRate 目标采样率
+     * @return 重采样后的 PCM；入参为空或采样率非法时原样返回，避免调用方多做判断
+     */
+    public static byte[] resamplePcm16(byte[] pcm16le, int srcRate, int dstRate) {
+        if (pcm16le == null || pcm16le.length < 2) return pcm16le;
+        if (srcRate == dstRate || srcRate <= 0 || dstRate <= 0) return pcm16le;
+
+        int srcSamples = pcm16le.length / 2;
+        int dstSamples = (int) ((long) srcSamples * dstRate / srcRate);
+        if (dstSamples <= 0) return pcm16le;
+        byte[] out = new byte[dstSamples * 2];
+
+        for (int i = 0; i < dstSamples; i++) {
+            // 目标第 i 个采样点对应源时间轴上的位置，取下取整点与下一点做线性插值
+            double srcPos = (double) i * srcRate / dstRate;
+            int i0 = (int) srcPos;
+            int i1 = Math.min(i0 + 1, srcSamples - 1);
+            double frac = srcPos - i0;
+
+            int s0 = readLe16(pcm16le, i0);
+            int s1 = readLe16(pcm16le, i1);
+            int v = (int) Math.round(s0 + (s1 - s0) * frac);
+
+            // 裁剪到 16bit 范围，避免插值溢出产生爆音
+            if (v > Short.MAX_VALUE) v = Short.MAX_VALUE;
+            else if (v < Short.MIN_VALUE) v = Short.MIN_VALUE;
+
+            out[i * 2] = (byte) (v & 0xFF);
+            out[i * 2 + 1] = (byte) ((v >> 8) & 0xFF);
+        }
+        return out;
+    }
+
+    /** 读取小端 16bit 采样值（按采样点下标寻址） */
+    private static short readLe16(byte[] b, int sampleIndex) {
+        int lo = b[sampleIndex * 2] & 0xFF;
+        int hi = b[sampleIndex * 2 + 1];
+        return (short) ((hi << 8) | lo);
+    }
 }

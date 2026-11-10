@@ -50,6 +50,15 @@ public final class FileUtils {
     }
 
     /**
+     * 删除单个文件（不递归、不删目录）。
+     */
+    public static boolean deleteFile(File file) {
+        // 文件本就不存在时视为删除成功（幂等），便于调用方无需先做存在性判断
+        if (file == null || !file.exists()) return true;
+        return file.delete();
+    }
+
+    /**
      * 递归删除目录及其内容。
      */
     public static void cleanupDir(File dir) {

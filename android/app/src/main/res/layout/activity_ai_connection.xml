@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- 标题栏 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="8dp">
+
+            <Button
+                android:id="@+id/btnBack"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="← 返回"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="AI 交互后端连接"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:gravity="center" />
+
+            <!-- 占位，让标题居中 -->
+            <View
+                android:layout_width="72dp"
+                android:layout_height="1dp" />
+        </LinearLayout>
+
+        <!-- 连接状态 -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:background="#F5F5F5"
+            android:text="● 未连接"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#888888" />
+
+        <!-- 地址输入 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="后端地址"
+            android:textSize="14sp"
+            android:textColor="#333333"
+            android:paddingTop="12dp"
+            android:paddingBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!--
+                inputType 必须用 phone：numberDecimal 会让系统只允许一个小数点，
+                导致 IP 地址输入完第一段（如 "192."）后无法再输入第二个点。
+                phone 提供数字键盘且带 '.' 符号键，可正常输入 IPv4。
+            -->
+            <EditText
+                android:id="@+id/etHost"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="3"
+                android:hint="例如 192.168.0.194"
+                android:inputType="phone"
+                android:digits="0123456789."
+                android:maxLength="15"
+                android:textSize="16sp"
+                android:importantForAutofill="no" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" : "
+                android:textSize="18sp"
+                android:textColor="#666666" />
+
+            <EditText
+                android:id="@+id/etPort"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="端口"
+                android:inputType="number"
+                android:maxLength="5"
+                android:textSize="16sp"
+                android:importantForAutofill="no" />
+        </LinearLayout>
+
+        <!-- 操作按钮 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btnConnect"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="连接"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnDisconnect"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="断开"
+                android:enabled="false"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 调试用：跳过握手校验（对端尚未实现回包时使用） -->
+        <CheckBox
+            android:id="@+id/cbSkipHandshake"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="跳过握手校验（调试：对端未实现回包时勾选）"
+            android:textSize="13sp"
+            android:textColor="#666666" />
+
+        <!-- 历史记录 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="历史地址"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp" />
+
+        <LinearLayout
+            android:id="@+id/llHistory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:background="#FAFAFA" />
+
+        <!-- 日志 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="连接日志"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="160dp"
+            android:padding="8dp"
+            android:background="#1E1E1E"
+            android:typeface="monospace"
+            android:textSize="11sp"
+            android:textColor="#B0E0B0"
+            android:text="" />
+
+    </LinearLayout>
+</ScrollView>

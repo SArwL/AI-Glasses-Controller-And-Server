@@ -233,6 +233,10 @@ public class MediaSyncManager {
         deviceNotifyListener = new GlassesDeviceNotifyListener() {
             @Override
             public void parseData(int cmdType, GlassesDeviceNotifyRsp response) {
+              // 整段分发必须兜底：本方法在主线程执行，事件处理里任何一处异常都会让 App
+              // 直接闪退（按键打断的 NetworkOnMainThreadException 就是这么崩的）。
+              // 单个事件处理失败不该带走整个进程，记日志后忽略即可。
+              try {
                 // loadData[0..5] 为协议固定字段，loadData[6] 为事件类型，loadData[7..] 为事件参数
                 int eventType = response.getLoadData()[6] & 0xFF;
 
@@ -251,9 +255,12 @@ public class MediaSyncManager {
                                         }), 1500);
                         break;
 
-                    case 0x03: // 麦克风启动（AI对话模式，参考App仅记录日志）
+                    case 0x03: // 麦克风启动：用户按下 AI 对话按键，眼镜开始收音
                         if (response.getLoadData()[7] == 1) {
-                            Log.i(TAG, "眼镜麦克风已启动");
+                            Log.i(TAG, "眼镜麦克风已启动（用户按下 AI 对话按键）");
+                            // 用户抢话 → 打断正在播报的 AI 回复。
+                            // 没有在播报时是空操作，因此正常按键说话不会误发 0x40
+                            AiReplyAudioManager.interruptIfSpeaking("眼镜0x03麦克风启动");
                         }
                         break;
 
@@ -270,13 +277,25 @@ public class MediaSyncManager {
                     case 0x0b: // 设备心跳/文件同步状态事件
                         break;
 
-                    case 0x0c: // 眼镜暂停/语音播报事件（参考App仅记录）
-                        Log.i(TAG, "眼镜事件0x0c: loadData[7]=" + (response.getLoadData()[7] & 0xFF));
+                    case 0x0c: // 眼镜触发暂停事件（语音播报）—— SDK 文档第 6 页原文注释
+                        // SDK 内部对这个事件的既有处理是：清语音心跳/超时任务 → aiVoicePlay(3)
+                        // → 拆 P2P → 回调 voiceFromGlassesStatus(2)，即"播报被打断/说话结束"
+                        if (response.getLoadData()[7] == 1) {
+                            Log.i(TAG, "眼镜0x0c（暂停/语音播报）→ 打断播报");
+                            AiReplyAudioManager.interruptIfSpeaking("眼镜0x0c暂停事件");
+                        } else {
+                            Log.i(TAG, "眼镜事件0x0c: loadData[7]="
+                                    + (response.getLoadData()[7] & 0xFF) + "（非触发状态，忽略）");
+                        }
                         break;
 
                     default:
                         break;
                 }
+              } catch (Exception e) {
+                // 兜底：设备事件处理异常只记日志，不让它杀掉 App
+                Log.e(TAG, "设备事件处理异常，已忽略该事件", e);
+              }
             }
         };
     }

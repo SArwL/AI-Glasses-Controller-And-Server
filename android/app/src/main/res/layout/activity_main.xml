@@ -87,6 +87,27 @@
         android:enabled="false"
         android:textSize="14sp" />
 
+    <!-- AI 交互模式入口 -->
+    <Button
+        android:id="@+id/btnAiMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="AI 交互模式"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <!-- AI 后端连接状态 -->
+    <TextView
+        android:id="@+id/tvAiBackendStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="6dp"
+        android:paddingStart="10dp"
+        android:text="AI 后端: ○ 未连接"
+        android:textSize="13sp"
+        android:textColor="#888888" />
+
     <!-- 媒体控制按钮 -->
     <LinearLayout
         android:layout_width="match_parent"
