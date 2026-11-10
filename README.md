@@ -51,3 +51,13 @@ app/src/main/java/com/sdk/glassessdksample/
 ├── events/                     # EventBus 事件
 └── utils/                      # 文件 / PCM / 权限工具
 ```
+
+## 配套服务器端（Jetson）
+
+除 Android App 外，本仓库还包含运行在 Jetson AGX Orin 上的配套后端：[`jetson-backend/`](jetson-backend/)。
+
+- UDP 服务端（Qt 5.15）：握手应答、语音/图片接收、分片重组、音频回传
+- 三路 Python 桥接：SenseVoice ASR / Qwen LLM（llama-server）/ Matcha + Kokoro TTS
+- 协议设计文档（字节布局已冻结）：[`jetson-backend/docs/udp-protocol-design.md`](jetson-backend/docs/udp-protocol-design.md)
+
+部署与构建说明见 [`jetson-backend/README.md`](jetson-backend/README.md)。

@@ -1,0 +1,25 @@
+[Unit]
+Description=llama.cpp llama-server (Qwen3.6-35B-A3B multimodal backend for smart glasses)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/ssd/jetson/Qwen_LLM/llama.cpp
+Environment=LD_LIBRARY_PATH=/mnt/ssd/jetson/Qwen_LLM/llama.cpp/build/bin
+# keep Orin at max clocks (safe to re-run; harmless if already active)
+ExecStartPre=/usr/bin/jetson_clocks
+ExecStart=/mnt/ssd/jetson/Qwen_LLM/llama.cpp/build/bin/llama-server \
+    -m /mnt/ssd/jetson/Qwen_LLM/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
+    --mmproj /mnt/ssd/jetson/Qwen_LLM/models/mmproj-F16.gguf \
+    --host 0.0.0.0 \
+    --port 8080 \
+    --ctx-size 65536 \
+    --parallel 2 \
+    --threads 8 \
+    --alias qwen3.6-35b-a3b
+Restart=always
+RestartSec=5
+# unified memory: do NOT set MemoryMax here, the model lives in the same RAM
+
+[Install]
+WantedBy=multi-user.target

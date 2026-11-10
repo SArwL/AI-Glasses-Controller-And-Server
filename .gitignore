@@ -21,7 +21,24 @@ local.properties
 # 厂商 SDK 二进制（专有内容，不入库；编译需自行放入）
 app/libs/
 
-# 厂商 SDK 文档与个人开发日志
-docs/
+# 厂商 SDK 文档与个人开发日志（仅忽略根目录 docs/，后端文档不受影响）
+/docs/
 GLASSES_SDK_DOC_CN.pdf
 AI眼镜SDK开发日志.docx
+
+# ============ Jetson 后端 ============
+jetson-backend/**/__pycache__/
+jetson-backend/**/*.pyc
+jetson-backend/**/venv/
+jetson-backend/**/models/
+jetson-backend/**/received/
+jetson-backend/**/build*/
+jetson-backend/tts/out/
+jetson-backend/tts/logs/
+jetson-backend/tts/.hf-cache/
+jetson-backend/**/*.pro.user
+jetson-backend/**/*.onnx
+jetson-backend/**/*.gguf
+jetson-backend/**/*.wav
+jetson-backend/**/*.pcm
+jetson-backend/**/*.pcm16k
