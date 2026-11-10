@@ -1,15 +1,15 @@
 *.iml
 .gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+android/local.properties
+android/.idea/caches
+android/.idea/libraries
+android/.idea/modules.xml
+android/.idea/workspace.xml
+android/.idea/navEditor.xml
+android/.idea/assetWizardSettings.xml
 .DS_Store
-/build
-/captures
+android/build
+android/captures
 .externalNativeBuild
 .cxx
 local.properties
@@ -19,7 +19,7 @@ local.properties
 .claude/
 
 # 厂商 SDK 二进制（专有内容，不入库；编译需自行放入）
-app/libs/
+android/app/libs/
 
 # 厂商 SDK 文档与个人开发日志（仅忽略根目录 docs/，后端文档不受影响）
 /docs/

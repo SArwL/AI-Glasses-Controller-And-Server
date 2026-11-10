@@ -1,7 +1,7 @@
 # AI 眼镜 Jetson 后端
 
-本目录是 AI 眼镜（CY01_0799）的 **Jetson AGX Orin 服务端**，与仓库根目录的 Android App
-通过局域网 UDP 通信：接收语音与图片、调用本地 ASR / LLM / TTS，并把语音回复回传给手机。
+本目录是 AI 眼镜（CY01_0799）的 **Jetson AGX Orin 服务端**，与仓库 [`android/`](../android/) 目录的
+Android App 通过局域网 UDP 通信：接收语音与图片、调用本地 ASR / LLM / TTS，并把语音回复回传给手机。
 
 ## 系统架构
 
